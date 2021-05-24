@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Timesheets.Domain.Interfaces;
+using Timesheets.Models;
 using Timesheets.Models.Dto;
 
 namespace Timesheets.Controllers
@@ -14,13 +15,29 @@ namespace Timesheets.Controllers
     {
         private readonly ISheetManager _sheetManager;
         private readonly IContractManager _contractManager;
-        
-        public SheetsController(ISheetManager sheetManager, IContractManager contractManager)
+        private readonly ILoginManager _loginManager;
+
+        public SheetsController(ISheetManager sheetManager, IContractManager contractManager, ILoginManager loginManager)
         {
             _sheetManager = sheetManager;
             _contractManager = contractManager;
+            _loginManager = loginManager;
         }
 
+        [AllowAnonymous]
+        [HttpPost("authenticate")]
+        public async Task<IActionResult> Authenticate([FromQuery] User user)
+        {
+            var token = await _loginManager.Authenticate(user);
+            if (string.IsNullOrWhiteSpace(token.AccessToken))
+            {
+                return BadRequest(new {message = "Username or password is incorrect"});
+            }
+            
+            return Ok(token.AccessToken);
+        }
+        
+        [Authorize(Roles = "user")]
         [HttpGet("{id}")]
         public IActionResult Get([FromQuery] Guid id)
         {
@@ -38,6 +55,7 @@ namespace Timesheets.Controllers
         }
 
         /// <summary> Возвращает запись табеля </summary>
+        [Authorize(Roles = "user")]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] SheetRequest sheet)
         {
@@ -53,6 +71,7 @@ namespace Timesheets.Controllers
         }
 
         /// <summary> Обновляет запись табеля </summary>
+        [Authorize(Roles = "user")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] SheetRequest sheet)
         {
